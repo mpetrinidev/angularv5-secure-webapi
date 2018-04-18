@@ -7,12 +7,18 @@ namespace PtcApi.Controllers
     [Route("api/[controller]")]
     public class SecurityController : BaseApiController
     {
+        private JwtSettings _settings = null;
+        public SecurityController(JwtSettings settings)
+        {
+            _settings = settings;
+        }
+
         [HttpPost("login")]
         public IActionResult Login([FromBody] AppUser user)
         {
             IActionResult ret = null;
             var auth = new AppUserAuth();
-            var mgr = new SecurityManager();
+            var mgr = new SecurityManager(_settings);
 
             auth = mgr.ValidateUser(user);
             if (auth.IsAuthenticated)

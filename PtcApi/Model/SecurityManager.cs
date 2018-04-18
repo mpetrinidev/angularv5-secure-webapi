@@ -1,11 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace PtcApi.Model
 {
     public class SecurityManager
     {
+        private JwtSettings _settings = null;
+        public SecurityManager(JwtSettings settings)
+        {
+            _settings = settings;
+        }
+
         public AppUserAuth ValidateUser(AppUser user)
         {
             var ret = new AppUserAuth();
@@ -44,6 +54,44 @@ namespace PtcApi.Model
 
             return list;
         }
+
+        protected string BuildJwtToken(AppUserAuth authUser)
+        {
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Key));
+
+            var jwtClaims = new List<Claim>();
+            jwtClaims.Add(new Claim(JwtRegisteredClaimNames.Sub, authUser.UserName));
+            jwtClaims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+
+            jwtClaims.Add(new Claim("isAuthenticated",
+                authUser.IsAuthenticated.ToString().ToLower()));
+            jwtClaims.Add(new Claim("canAccessProducts",
+                authUser.CanAccessProducts.ToString().ToLower()));
+            jwtClaims.Add(new Claim("canAddProduct",
+                authUser.CanAddProduct.ToString().ToLower()));
+            jwtClaims.Add(new Claim("canSaveProduct",
+                authUser.CanSaveProduct.ToString().ToLower()));
+            jwtClaims.Add(new Claim("canAccessCategories",
+                authUser.CanAccessCategories.ToString().ToLower()));
+            jwtClaims.Add(new Claim("canAddCategory",
+                authUser.CanAddCategory.ToString().ToLower()));
+
+            var token = new JwtSecurityToken(
+                issuer: _settings.Issuer,
+                audience: _settings.Audience,
+                claims: jwtClaims,
+                notBefore: DateTime.UtcNow,
+                expires: DateTime.UtcNow.AddMinutes(
+                    _settings.MinutesToExpiration
+                ),
+                signingCredentials: new SigningCredentials(
+                    key, SecurityAlgorithms.HmacSha256
+                )
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
         protected AppUserAuth BuildUserAuthObject(AppUser authUser)
         {
             var ret = new AppUserAuth();
@@ -67,6 +115,7 @@ namespace PtcApi.Model
                 }
             }
 
+            ret.BearerToken = BuildJwtToken(ret);
             return ret;
         }
     }
