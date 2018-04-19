@@ -1,16 +1,15 @@
-import { Injectable } from '@angular/core';
-import { AppUserAuth } from './app-user-auth';
-import { AppUser } from './app-user';
-import { Observable } from 'rxjs/Observable';
-import { of } from 'rxjs/observable/of';
-import { tap } from 'rxjs/operators/tap';
-import { LOGIN_MOCKS } from './login-mocks';
-import { HttpHeaders, HttpClient } from '@angular/common/http';
+import { Injectable } from "@angular/core";
+import { AppUserAuth } from "./app-user-auth";
+import { AppUser } from "./app-user";
+import { Observable } from "rxjs/Observable";
+import { of } from "rxjs/observable/of";
+import { tap } from "rxjs/operators/tap";
+import { HttpHeaders, HttpClient } from "@angular/common/http";
 
-const API_URL = "http://localhost:5000/api/security/"
+const API_URL = "http://localhost:5000/api/security/";
 const httpOptions = {
   headers: new HttpHeaders({
-    'Content-Type': 'application/json'
+    "Content-Type": "application/json"
   })
 };
 
@@ -18,9 +17,9 @@ const httpOptions = {
 export class SecurityService {
   securityObject: AppUserAuth = new AppUserAuth();
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {}
 
-  logout(): void{
+  logout(): void {
     this.resetSecurityObject();
   }
 
@@ -29,11 +28,7 @@ export class SecurityService {
     this.securityObject.bearerToken = "";
     this.securityObject.isAuthenticated = false;
 
-    this.securityObject.canAccessProducts = false;
-    this.securityObject.canAddProduct = false;
-    this.securityObject.canSaveProduct = false;
-    this.securityObject.canAccessCategories = false;
-    this.securityObject.canAddCategory = false;
+    this.securityObject.claims = [];
 
     localStorage.removeItem("bearerToken");
   }
@@ -41,30 +36,60 @@ export class SecurityService {
   login(entity: AppUser): Observable<AppUserAuth> {
     this.resetSecurityObject();
 
-    return this.http.post<AppUserAuth>(API_URL + "login", 
-                                      entity, 
-                                      httpOptions).pipe(
-                                        tap(
-                                          resp => {
-                                            Object.assign(this.securityObject, resp);
+    return this.http
+      .post<AppUserAuth>(API_URL + "login", entity, httpOptions)
+      .pipe(
+        tap(resp => {
+          Object.assign(this.securityObject, resp);
 
-                                            localStorage.setItem("bearerToken", this.securityObject.bearerToken);
-                                          }
-                                        )
-                                      );
+          localStorage.setItem("bearerToken", this.securityObject.bearerToken);
+        })
+      );
+  }
 
-    //use assign to update the current object.
-    //don't create a new appuserauth object because that
-    //destroy all references to object
+  hasClaim(claimType: any, claimValue?: any) {
+    let ret: boolean = false;
 
-    // Object.assign(this.securityObject, LOGIN_MOCKS.find(
-    //   user => user.userName.toLowerCase() === entity.userName.toLowerCase()
-    // ));
+    if (typeof claimType === "string") {
+      ret = this.isClaimValid(claimType, claimValue);
+    } else {
+      let claims: string[] = claimType;
+      if (claims) {
+        for (let index = 0; index < claims.length; index++) {
+          ret = this.isClaimValid(claims[index]);
+          //si uno es true, entonces que termine ok
+          if (ret) break;
+        }
+      }
+    }
+    return ret;
+  }
 
-    // if(this.securityObject.userName !== "") {
-    //   localStorage.setItem("bearerToken", this.securityObject.bearerToken);
-    // }
+  private isClaimValid(claimType: string, claimValue?: string): boolean {
+    let ret: boolean = false;
+    let auth: AppUserAuth = null;
 
-    // return of<AppUserAuth>(this.securityObject);
+    auth = this.securityObject;
+    if (auth) {
+      // see if the claim type has a value
+      // *hasClaim="'claimType:value'"
+      if (claimType.indexOf(":") >= 0) {
+        let words: string[] = claimType.split(":");
+        claimType = words[0].toLowerCase();
+        claimValue = words[1];
+      } else {
+        claimType = claimType.toLowerCase();
+        //obtener el valor o asumir que es true
+        claimValue = claimValue ? claimValue : "true";
+      }
+
+      ret =
+        auth.claims.find(
+          c =>
+            c.claimType.toLowerCase() == claimType && c.claimValue == claimValue
+        ) != null;
+    }
+
+    return ret;
   }
 }

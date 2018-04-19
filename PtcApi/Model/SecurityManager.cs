@@ -65,16 +65,10 @@ namespace PtcApi.Model
 
             jwtClaims.Add(new Claim("isAuthenticated",
                 authUser.IsAuthenticated.ToString().ToLower()));
-            jwtClaims.Add(new Claim("canAccessProducts",
-                authUser.CanAccessProducts.ToString().ToLower()));
-            jwtClaims.Add(new Claim("canAddProduct",
-                authUser.CanAddProduct.ToString().ToLower()));
-            jwtClaims.Add(new Claim("canSaveProduct",
-                authUser.CanSaveProduct.ToString().ToLower()));
-            jwtClaims.Add(new Claim("canAccessCategories",
-                authUser.CanAccessCategories.ToString().ToLower()));
-            jwtClaims.Add(new Claim("canAddCategory",
-                authUser.CanAddCategory.ToString().ToLower()));
+            
+            //add custom claims from the claim array
+            foreach (var claim in authUser.Claims)
+                jwtClaims.Add(new Claim(claim.ClaimType, claim.ClaimValue));
 
             var token = new JwtSecurityToken(
                 issuer: _settings.Issuer,
@@ -94,28 +88,16 @@ namespace PtcApi.Model
 
         protected AppUserAuth BuildUserAuthObject(AppUser authUser)
         {
-            var ret = new AppUserAuth();
-            var claims = new List<AppUserClaim>();
-
-            ret.UserName = authUser.UserName;
-            ret.IsAuthenticated = true;
-            ret.BearerToken = new Guid().ToString();
-
-            claims = GetUserClaims(authUser);
-
-            foreach (var claim in claims)
+            var ret = new AppUserAuth
             {
-                try
-                {
-                    typeof(AppUserAuth).GetProperty(claim.ClaimType)
-                    .SetValue(ret, Convert.ToBoolean(claim.ClaimValue), null);
-                }
-                catch
-                {
-                }
-            }
+                UserName = authUser.UserName,
+                IsAuthenticated = true,
+                BearerToken = new Guid().ToString(),
+                Claims = GetUserClaims(authUser)
+            };
 
             ret.BearerToken = BuildJwtToken(ret);
+
             return ret;
         }
     }
